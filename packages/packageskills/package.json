@@ -2,7 +2,26 @@
   "name": "packageskills",
   "version": "0.0.0",
   "description": "CLI for scaffolding and packaging agent skills.",
+  "license": "MIT",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Noudea/packageskills.git",
+    "directory": "packages/packageskills"
+  },
+  "bugs": {
+    "url": "https://github.com/Noudea/packageskills/issues"
+  },
+  "homepage": "https://github.com/Noudea/packageskills#readme",
+  "keywords": [
+    "ai",
+    "agent",
+    "claude",
+    "cli",
+    "codex",
+    "opencode",
+    "skills"
+  ],
   "bin": {
     "packageskills": "./dist/cli.js"
   },

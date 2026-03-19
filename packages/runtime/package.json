@@ -2,10 +2,32 @@
   "name": "@packageskills/runtime",
   "version": "0.0.0",
   "description": "Runtime helpers for installed packageskills commands.",
+  "license": "MIT",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Noudea/packageskills.git",
+    "directory": "packages/runtime"
+  },
+  "bugs": {
+    "url": "https://github.com/Noudea/packageskills/issues"
+  },
+  "homepage": "https://github.com/Noudea/packageskills#readme",
+  "keywords": [
+    "ai",
+    "agent",
+    "claude",
+    "codex",
+    "opencode",
+    "runtime",
+    "skills"
+  ],
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "exports": {
     ".": "./dist/index.js"
   },
