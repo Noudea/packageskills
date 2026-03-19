@@ -31,10 +31,12 @@ export async function getSkillsDirectoryState(
 
 export async function scaffoldTemplateFiles({
   cwd,
+  hasExistingSkillsDirectory,
   packageType,
   templateData,
 }: {
   cwd: string;
+  hasExistingSkillsDirectory: boolean;
   packageType: PackageType;
   templateData: TemplateData;
 }): Promise<string[]> {
@@ -42,6 +44,11 @@ export async function scaffoldTemplateFiles({
     resolveTemplatesDirectory("shared"),
     resolveTemplatesDirectory(packageType),
   ];
+  const scaffoldFiles: Array<{
+    outputRelativePath: string;
+    renderedTemplate: string;
+    shouldWrite: boolean;
+  }> = [];
   const filePaths: string[] = [];
 
   for (const templateDirectory of templateDirectories) {
@@ -49,16 +56,37 @@ export async function scaffoldTemplateFiles({
 
     for (const templateFilePath of templateFilePaths) {
       const outputRelativePath = getOutputRelativePath(templateDirectory, templateFilePath);
+
+      if (hasExistingSkillsDirectory && isSourceSkillOutput(outputRelativePath)) {
+        continue;
+      }
+
       const templateSource = await readFile(templateFilePath, "utf8");
       const renderedTemplate = renderTemplate(templateSource, templateData);
 
-      await writeScaffoldFile({
-        cwd,
-        outputRelativePath,
-        renderedTemplate,
-      });
+      scaffoldFiles.push(
+        await prepareScaffoldFile({
+          cwd,
+          outputRelativePath,
+          renderedTemplate,
+        }),
+      );
+    }
+  }
 
-      filePaths.push(outputRelativePath);
+  for (const scaffoldFile of scaffoldFiles) {
+    if (!scaffoldFile.shouldWrite) {
+      continue;
+    }
+
+    const didWrite = await writeScaffoldFile({
+      cwd,
+      outputRelativePath: scaffoldFile.outputRelativePath,
+      renderedTemplate: scaffoldFile.renderedTemplate,
+    });
+
+    if (didWrite) {
+      filePaths.push(scaffoldFile.outputRelativePath);
     }
   }
 
@@ -67,14 +95,64 @@ export async function scaffoldTemplateFiles({
   return filePaths;
 }
 
+async function prepareScaffoldFile({
+  cwd,
+  outputRelativePath,
+  renderedTemplate,
+}: {
+  cwd: string;
+  outputRelativePath: string;
+  renderedTemplate: string;
+}): Promise<{
+  outputRelativePath: string;
+  renderedTemplate: string;
+  shouldWrite: boolean;
+}> {
+  const outputFilePath = resolve(cwd, outputRelativePath);
+
+  try {
+    const existingFileSource = await readFile(outputFilePath, "utf8");
+
+    if (!isGeneratedByPackageskills(existingFileSource)) {
+      throw new Error(`Could not scaffold \`${outputRelativePath}\` because it already exists.`);
+    }
+
+    return {
+      outputRelativePath,
+      renderedTemplate,
+      shouldWrite: existingFileSource !== renderedTemplate,
+    };
+  } catch (error) {
+    if (isMissingPathError(error)) {
+      return {
+        outputRelativePath,
+        renderedTemplate,
+        shouldWrite: true,
+      };
+    }
+
+    throw error;
+  }
+}
+
 function getOutputRelativePath(templateDirectory: string, templateFilePath: string): string {
   return relative(templateDirectory, templateFilePath).replace(/\.hbs$/, "");
+}
+
+function isGeneratedByPackageskills(fileContents: string): boolean {
+  return fileContents.includes("// Generate by packageskills");
 }
 
 function isExecutableFile(outputRelativePath: string): boolean {
   const pathSegments = outputRelativePath.split(sep);
 
   return pathSegments[0] === "bin" && outputRelativePath.endsWith(".js");
+}
+
+function isSourceSkillOutput(outputRelativePath: string): boolean {
+  const pathSegments = outputRelativePath.split(sep);
+
+  return pathSegments[0] === "packageskills";
 }
 
 function isMissingPathError(error: unknown): boolean {
@@ -133,31 +211,16 @@ async function writeScaffoldFile({
   cwd: string;
   outputRelativePath: string;
   renderedTemplate: string;
-}): Promise<void> {
+}): Promise<boolean> {
   const outputFilePath = resolve(cwd, outputRelativePath);
 
   await mkdir(dirname(outputFilePath), { recursive: true });
 
-  try {
-    await writeFile(outputFilePath, renderedTemplate, {
-      encoding: "utf8",
-      flag: "wx",
-    });
-  } catch (error) {
-    if (isFileExistsError(error)) {
-      throw new Error(`Could not scaffold \`${outputRelativePath}\` because it already exists.`, {
-        cause: error,
-      });
-    }
-
-    throw error;
-  }
+  await writeFile(outputFilePath, renderedTemplate, "utf8");
 
   if (isExecutableFile(outputRelativePath)) {
     await chmod(outputFilePath, 0o755);
   }
-}
 
-function isFileExistsError(error: unknown): boolean {
-  return error instanceof Error && "code" in error && error.code === "EEXIST";
+  return true;
 }

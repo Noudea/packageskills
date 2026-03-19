@@ -6,8 +6,8 @@ export async function runInit(): Promise<void> {
     cwd: process.cwd(),
   });
 
-  if (result.status === "skipped") {
-    process.stdout.write("`packageskills/` already exists. Skipping init.\n");
+  if (result.status === "unchanged") {
+    process.stdout.write("packageskills is already set up.\n");
     return;
   }
 

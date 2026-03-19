@@ -18,10 +18,6 @@ interface ScaffoldPackageSkillsOptions {
   cwd: string;
 }
 
-interface SkippedScaffoldResult {
-  status: "skipped";
-}
-
 interface CreatedScaffoldResult {
   filePaths: string[];
   generatedCommandName: string;
@@ -30,19 +26,20 @@ interface CreatedScaffoldResult {
   status: "created";
 }
 
-export type ScaffoldPackageSkillsResult = CreatedScaffoldResult | SkippedScaffoldResult;
+interface UnchangedScaffoldResult {
+  generatedCommandName: string;
+  packageType: PackageType;
+  status: "unchanged";
+}
+
+export type ScaffoldPackageSkillsResult = CreatedScaffoldResult | UnchangedScaffoldResult;
 
 export async function scaffoldPackageSkills({
   cwd,
 }: ScaffoldPackageSkillsOptions): Promise<ScaffoldPackageSkillsResult> {
   const skillsDirectoryPath = resolve(cwd, "packageskills");
   const existingSkillsDirectory = await getSkillsDirectoryState(skillsDirectoryPath);
-
-  if (existingSkillsDirectory === "directory") {
-    return {
-      status: "skipped",
-    };
-  }
+  const hasExistingSkillsDirectory = existingSkillsDirectory === "directory";
 
   if (existingSkillsDirectory === "file") {
     throw new Error("`packageskills` already exists and is not a directory.");
@@ -67,6 +64,7 @@ export async function scaffoldPackageSkills({
   };
   const filePaths = await scaffoldTemplateFiles({
     cwd,
+    hasExistingSkillsDirectory,
     packageType,
     templateData,
   });
@@ -76,6 +74,14 @@ export async function scaffoldPackageSkills({
     await writeFile(packageJsonPath, packageJsonUpdate.source, "utf8");
     changedFilePaths.push("package.json");
     changedFilePaths.sort();
+  }
+
+  if (changedFilePaths.length === 0) {
+    return {
+      generatedCommandName,
+      packageType,
+      status: "unchanged",
+    };
   }
 
   return {
