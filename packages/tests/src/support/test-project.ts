@@ -2,7 +2,7 @@ import { execFile as execFileCallback } from "node:child_process";
 import { cp, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { config as loadDotenv } from "dotenv";
 
@@ -58,6 +58,68 @@ export async function runPackageskillsCli({ args, cwd }: { args: string[]; cwd: 
   try {
     const result = await execFile(process.execPath, [getCliEntryFilePath(), ...args], {
       cwd,
+    });
+
+    return {
+      exitCode: 0,
+      stderr: result.stderr,
+      stdout: result.stdout,
+    };
+  } catch (error) {
+    if (isFailedCommand(error)) {
+      return {
+        exitCode: error.code,
+        stderr: error.stderr,
+        stdout: error.stdout,
+      };
+    }
+
+    throw error;
+  }
+}
+
+export async function runPackageskillsRuntime({
+  args,
+  commandName,
+  cwd,
+  packageName,
+  scriptFilePath,
+}: {
+  args: string[];
+  commandName?: string;
+  cwd: string;
+  packageName: string;
+  scriptFilePath: string;
+}): Promise<{
+  exitCode: number;
+  stderr: string;
+  stdout: string;
+}> {
+  const runtimeOptions = {
+    argv: args,
+    commandName: commandName ?? `${getUnscopedPackageName(packageName)}-skills`,
+    cwd,
+    packageName,
+    scriptFilePath,
+  };
+  const runnerSource = [
+    `import { runPackageSkillsCli } from ${JSON.stringify(pathToFileURL(getRuntimeEntryFilePath()).href)};`,
+    'const runtimeOptions = JSON.parse(process.env.PACKAGESKILLS_RUNTIME_OPTIONS ?? "{}");',
+    "try {",
+    "  await runPackageSkillsCli(runtimeOptions);",
+    "} catch (error) {",
+    "  process.stderr.write(`${error instanceof Error ? error.message : String(error)}\\n`);",
+    "  process.exitCode = 1;",
+    "}",
+  ].join("\n");
+
+  try {
+    const result = await execFile(process.execPath, ["--input-type=module", "-e", runnerSource], {
+      cwd,
+      env: {
+        ...process.env,
+        PACKAGESKILLS_RUNTIME_OPTIONS: JSON.stringify(runtimeOptions),
+      },
     });
 
     return {
@@ -154,6 +216,14 @@ function resolveWorkspaceDependencyVersion(
 
 function getCliEntryFilePath(): string {
   return resolveWorkspacePath("packages", "cli", "dist", "cli.js");
+}
+
+function getRuntimeEntryFilePath(): string {
+  return resolveWorkspacePath("packages", "runtime", "dist", "index.js");
+}
+
+function getUnscopedPackageName(packageName: string): string {
+  return packageName.startsWith("@") ? (packageName.split("/").at(1) ?? packageName) : packageName;
 }
 
 function resolveWorkspacePath(...relativePathSegments: string[]): string {
