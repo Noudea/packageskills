@@ -1,0 +1,19 @@
+{
+  "name": "sandbox",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@10.32.1",
+  "devDependencies": {
+    "packageskills": "workspace:*"
+  },
+  "files": [
+    "bin",
+    "packageskills"
+  ],
+  "dependencies": {
+    "@packageskills/runtime": "workspace:^"
+  },
+  "bin": {
+    "sandbox-skills": "./bin/packageskills.js"
+  }
+}

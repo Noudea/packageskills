@@ -32,6 +32,22 @@ importers:
         specifier: ^8.57.1
         version: 8.57.1(eslint@10.0.3)(typescript@5.9.3)
 
+  apps/sandbox-consumer:
+    dependencies:
+      sandbox:
+        specifier: workspace:*
+        version: link:../sandbox-maintainer
+
+  apps/sandbox-maintainer:
+    dependencies:
+      "@packageskills/runtime":
+        specifier: workspace:^
+        version: link:../../packages/runtime
+    devDependencies:
+      packageskills:
+        specifier: workspace:*
+        version: link:../../packages/cli
+
   packages/cli:
     dependencies:
       "@packageskills/runtime":
