@@ -1,0 +1,8 @@
+{
+  "name": "@acme/toolkit",
+  "version": "1.0.0",
+  "bin": {
+    "toolkit": "./bin/toolkit.js",
+    "toolkit-skills": "./bin/custom-skills.js"
+  }
+}

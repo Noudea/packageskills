@@ -1,0 +1,13 @@
+{
+  "name": "@acme/demo-cli",
+  "version": "1.0.0",
+  "bin": "./bin/demo.js",
+  "dependencies": {
+    "@packageskills/runtime": "^9.9.9",
+    "chalk": "^5.4.0"
+  },
+  "files": [
+    "README.md",
+    "bin"
+  ]
+}

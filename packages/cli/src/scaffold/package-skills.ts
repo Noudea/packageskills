@@ -26,6 +26,7 @@ interface CreatedScaffoldResult {
   filePaths: string[];
   generatedCommandName: string;
   packageType: PackageType;
+  requiresInstall: boolean;
   status: "created";
 }
 
@@ -81,6 +82,7 @@ export async function scaffoldPackageSkills({
     filePaths: changedFilePaths,
     generatedCommandName,
     packageType,
+    requiresInstall: packageJsonUpdate.dependencyChanged,
     status: "created",
   };
 }

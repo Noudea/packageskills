@@ -1,0 +1,7 @@
+{
+  "name": "demo-cli",
+  "version": "1.0.0",
+  "devDependencies": {
+    "@packageskills/runtime": "^1.2.3"
+  }
+}

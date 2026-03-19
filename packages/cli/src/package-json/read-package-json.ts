@@ -7,6 +7,7 @@ export interface PackageJson {
   devDependencies?: unknown;
   files?: unknown;
   name?: unknown;
+  packageManager?: unknown;
   version?: unknown;
 }
 

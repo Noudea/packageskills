@@ -9,6 +9,7 @@ import { config as loadDotenv } from "dotenv";
 const execFile = promisify(execFileCallback);
 const testsPackageRootPath = fileURLToPath(new URL("../../", import.meta.url));
 const workspaceRootPath = fileURLToPath(new URL("../../../../", import.meta.url));
+const workspaceProtocol = "workspace:";
 loadDotenv({
   path: resolvePackagePath(".env"),
   quiet: true,
@@ -82,15 +83,31 @@ export async function getExpectedRuntimeDependencyVersion(): Promise<string> {
     resolveWorkspacePath("packages", "cli", "package.json"),
     "utf8",
   );
+  const runtimePackageJsonSource = await readFile(
+    resolveWorkspacePath("packages", "runtime", "package.json"),
+    "utf8",
+  );
   const cliPackageJson = JSON.parse(cliPackageJsonSource) as {
+    dependencies?: unknown;
+  };
+  const runtimePackageJson = JSON.parse(runtimePackageJsonSource) as {
     version?: unknown;
   };
+  const runtimeDependencyVersion = getRuntimeDependencyVersion(cliPackageJson.dependencies);
 
-  if (typeof cliPackageJson.version !== "string" || cliPackageJson.version.length === 0) {
-    throw new Error("Could not determine the CLI package version for test expectations.");
+  if (typeof runtimeDependencyVersion !== "string" || runtimeDependencyVersion.length === 0) {
+    throw new Error("Could not determine the runtime dependency version for test expectations.");
   }
 
-  return `^${cliPackageJson.version}`;
+  if (!runtimeDependencyVersion.startsWith(workspaceProtocol)) {
+    return runtimeDependencyVersion;
+  }
+
+  if (typeof runtimePackageJson.version !== "string" || runtimePackageJson.version.length === 0) {
+    throw new Error("Could not determine the runtime package version for test expectations.");
+  }
+
+  return resolveWorkspaceDependencyVersion(runtimeDependencyVersion, runtimePackageJson.version);
 }
 
 interface FailedCommandError extends Error {
@@ -108,6 +125,33 @@ function isFailedCommand(error: unknown): error is FailedCommandError {
   );
 }
 
+function getRuntimeDependencyVersion(dependencies: unknown): string | undefined {
+  if (!isRecord(dependencies)) {
+    return undefined;
+  }
+
+  const runtimeDependencyVersion = dependencies["@packageskills/runtime"];
+
+  return typeof runtimeDependencyVersion === "string" ? runtimeDependencyVersion : undefined;
+}
+
+function resolveWorkspaceDependencyVersion(
+  dependencySpecifier: string,
+  packageVersion: string,
+): string {
+  const workspaceRange = dependencySpecifier.slice(workspaceProtocol.length);
+
+  if (workspaceRange === "*" || workspaceRange.length === 0) {
+    return packageVersion;
+  }
+
+  if (workspaceRange === "^" || workspaceRange === "~") {
+    return `${workspaceRange}${packageVersion}`;
+  }
+
+  return workspaceRange;
+}
+
 function getCliEntryFilePath(): string {
   return resolveWorkspacePath("packages", "cli", "dist", "cli.js");
 }
@@ -122,4 +166,8 @@ function resolvePackagePath(...relativePathSegments: string[]): string {
 
 function shouldKeepTestProjects(): boolean {
   return process.env.KEEP_TEST_PROJECTS?.trim().toLowerCase() === "true";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

@@ -1,0 +1,17 @@
+{
+  "name": "@packageskills/runtime",
+  "version": "0.0.0",
+  "description": "Runtime helpers for installed packageskills commands.",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}

@@ -34,6 +34,9 @@ importers:
 
   packages/cli:
     dependencies:
+      "@packageskills/runtime":
+        specifier: workspace:^
+        version: link:../runtime
       cac:
         specifier: ^7.0.0
         version: 7.0.0
@@ -43,6 +46,8 @@ importers:
       jsonc-parser:
         specifier: ^3.3.1
         version: 3.3.1
+
+  packages/runtime: {}
 
   packages/tests:
     dependencies:

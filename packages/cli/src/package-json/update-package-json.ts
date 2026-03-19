@@ -19,6 +19,7 @@ interface UpdatePackageJsonForInitOptions {
 
 interface PackageJsonUpdateResult {
   changed: boolean;
+  dependencyChanged: boolean;
   source: string;
 }
 
@@ -36,10 +37,16 @@ export function updatePackageJsonForInit({
 
   nextSource = updateBinField(nextSource, packageJson, generatedCommandName);
   nextSource = updateFilesField(nextSource, packageJson, packageType);
-  nextSource = updateDependenciesField(nextSource, packageJson, runtimeDependencyVersion);
+  const dependencyUpdate = updateDependenciesField(
+    nextSource,
+    packageJson,
+    runtimeDependencyVersion,
+  );
+  nextSource = dependencyUpdate.source;
 
   return {
     changed: nextSource !== packageJsonDocument.source,
+    dependencyChanged: dependencyUpdate.dependencyChanged,
     source: nextSource,
   };
 }
@@ -144,24 +151,44 @@ function updateDependenciesField(
   packageJsonSource: string,
   packageJson: PackageJson,
   runtimeDependencyVersion: string,
-): string {
+): PackageJsonUpdateResult {
   const dependencyVersion = getRuntimeDependencyVersion(packageJson, runtimeDependencyVersion);
 
   if (isRecord(packageJson.dependencies)) {
     if (packageJson.dependencies[runtimePackageName] === dependencyVersion) {
-      return packageJsonSource;
+      return {
+        changed: false,
+        dependencyChanged: false,
+        source: packageJsonSource,
+      };
     }
 
     if (typeof packageJson.dependencies[runtimePackageName] === "string") {
-      return packageJsonSource;
+      return {
+        changed: false,
+        dependencyChanged: false,
+        source: packageJsonSource,
+      };
     }
 
-    return applyModify(packageJsonSource, ["dependencies", runtimePackageName], dependencyVersion);
+    return {
+      changed: true,
+      dependencyChanged: true,
+      source: applyModify(
+        packageJsonSource,
+        ["dependencies", runtimePackageName],
+        dependencyVersion,
+      ),
+    };
   }
 
-  return applyModify(packageJsonSource, ["dependencies"], {
-    [runtimePackageName]: dependencyVersion,
-  });
+  return {
+    changed: true,
+    dependencyChanged: true,
+    source: applyModify(packageJsonSource, ["dependencies"], {
+      [runtimePackageName]: dependencyVersion,
+    }),
+  };
 }
 
 function updateFilesField(

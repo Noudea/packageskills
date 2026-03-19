@@ -25,6 +25,7 @@ test(javascriptInitTestName, async () => {
     expect(stderr).toBe("");
     expect(stdout).toMatch(/Scaffolded packageskills files for a javascript package\./);
     expect(stdout).toMatch(/Generated command: demo-cli-skills/);
+    expect(stdout).toMatch(/Next step: run `npm install` to install `@packageskills\/runtime`\./);
 
     const binFilePath = resolve(projectPath, "bin", "packageskills.js");
     const skillFilePath = resolve(projectPath, "packageskills", "getting-started", "SKILL.md");
@@ -68,6 +69,7 @@ test(typescriptInitTestName, async () => {
     expect(stderr).toBe("");
     expect(stdout).toMatch(/Scaffolded packageskills files for a typescript package\./);
     expect(stdout).toMatch(/Generated command: toolkit-skills/);
+    expect(stdout).toMatch(/Next step: run `pnpm install` to install `@packageskills\/runtime`\./);
 
     const wrapperFilePath = resolve(projectPath, "bin", "packageskills.js");
     const sourceFilePath = resolve(projectPath, "src", "bin", "packageskills.ts");
@@ -224,9 +226,105 @@ test(existingPackageskillsAndBinTestName, async () => {
   }
 });
 
+const stringBinAndRuntimeTestName =
+  "init preserves a string bin, existing runtime dependency, and existing files entries";
+
+test(stringBinAndRuntimeTestName, async () => {
+  const { cleanup, projectPath } = await createFixtureCopy("init/string-bin-with-runtime", {
+    testName: stringBinAndRuntimeTestName,
+  });
+
+  try {
+    const { exitCode, stderr, stdout } = await runPackageskillsCli({
+      args: ["init"],
+      cwd: projectPath,
+    });
+    const packageJson = await readProjectPackageJson(projectPath);
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe("");
+    expect(stdout).toMatch(/Generated command: demo-cli-skills/);
+    expect(stdout).not.toMatch(/Next step: run `/);
+    expect(packageJson.bin).toEqual({
+      "demo-cli": "./bin/demo.js",
+      "demo-cli-skills": "./bin/packageskills.js",
+    });
+    expect(packageJson.dependencies).toEqual({
+      "@packageskills/runtime": "^9.9.9",
+      chalk: "^5.4.0",
+    });
+    expect(packageJson.files).toEqual(["README.md", "bin", "packageskills"]);
+  } finally {
+    await cleanup();
+  }
+});
+
+const runtimeDevDependencyTestName =
+  "init promotes a runtime devDependency into dependencies when needed";
+
+test(runtimeDevDependencyTestName, async () => {
+  const { cleanup, projectPath } = await createFixtureCopy("init/runtime-devdependency", {
+    testName: runtimeDevDependencyTestName,
+  });
+
+  try {
+    const { exitCode, stderr, stdout } = await runPackageskillsCli({
+      args: ["init"],
+      cwd: projectPath,
+    });
+    const packageJson = await readProjectPackageJson(projectPath);
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe("");
+    expect(stdout).toMatch(/Generated command: demo-cli-skills/);
+    expect(stdout).toMatch(/Next step: run `npm install` to install `@packageskills\/runtime`\./);
+    expect(packageJson.dependencies).toEqual({
+      "@packageskills/runtime": "^1.2.3",
+    });
+    expect(packageJson.devDependencies).toEqual({
+      "@packageskills/runtime": "^1.2.3",
+    });
+    expect(packageJson.files).toEqual(["bin", "packageskills"]);
+  } finally {
+    await cleanup();
+  }
+});
+
+const conflictingGeneratedBinEntryTestName =
+  "init fails when package.json already declares a conflicting generated companion bin";
+
+test(conflictingGeneratedBinEntryTestName, async () => {
+  const { cleanup, projectPath } = await createFixtureCopy("init/conflicting-generated-bin-entry", {
+    testName: conflictingGeneratedBinEntryTestName,
+  });
+
+  try {
+    const beforePackageJsonSource = await readFile(resolve(projectPath, "package.json"), "utf8");
+    const { exitCode, stderr, stdout } = await runPackageskillsCli({
+      args: ["init"],
+      cwd: projectPath,
+    });
+
+    expect(exitCode).toBe(1);
+    expect(stdout).toBe("");
+    expect(stderr).toBe(
+      "Could not add the generated bin because `toolkit-skills` already points to `./bin/custom-skills.js`.\n",
+    );
+    expect(await readFile(resolve(projectPath, "package.json"), "utf8")).toBe(
+      beforePackageJsonSource,
+    );
+    await expect(access(resolve(projectPath, "packageskills"))).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+  } finally {
+    await cleanup();
+  }
+});
+
 async function readProjectPackageJson(projectPath: string): Promise<{
   bin?: unknown;
   dependencies?: unknown;
+  devDependencies?: unknown;
   files?: unknown;
 }> {
   const packageJsonSource = await readFile(resolve(projectPath, "package.json"), "utf8");
@@ -234,6 +332,7 @@ async function readProjectPackageJson(projectPath: string): Promise<{
   return JSON.parse(packageJsonSource) as {
     bin?: unknown;
     dependencies?: unknown;
+    devDependencies?: unknown;
     files?: unknown;
   };
 }

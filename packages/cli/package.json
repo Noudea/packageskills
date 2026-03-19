@@ -19,6 +19,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@packageskills/runtime": "workspace:^",
     "cac": "^7.0.0",
     "handlebars": "^4.7.8",
     "jsonc-parser": "^3.3.1"
