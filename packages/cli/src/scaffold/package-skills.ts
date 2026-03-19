@@ -1,9 +1,12 @@
+import { writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { getDefaultRuntimeDependencyVersion } from "../package-json/cli-package-metadata.js";
 import {
   getGeneratedCommandName,
   getPackageName,
-  readPackageJson,
+  readPackageJsonDocument,
 } from "../package-json/read-package-json.js";
+import { updatePackageJsonForInit } from "../package-json/update-package-json.js";
 import {
   detectPackageType,
   getSkillsDirectoryState,
@@ -44,10 +47,19 @@ export async function scaffoldPackageSkills({
     throw new Error("`packageskills` already exists and is not a directory.");
   }
 
-  const packageJson = await readPackageJson(resolve(cwd, "package.json"));
+  const packageJsonPath = resolve(cwd, "package.json");
+  const packageJsonDocument = await readPackageJsonDocument(packageJsonPath);
+  const packageJson = packageJsonDocument.packageJson;
   const packageName = getPackageName(packageJson);
   const packageType = await detectPackageType(cwd);
   const generatedCommandName = getGeneratedCommandName(packageJson, packageName);
+  const runtimeDependencyVersion = await getDefaultRuntimeDependencyVersion();
+  const packageJsonUpdate = updatePackageJsonForInit({
+    generatedCommandName,
+    packageJsonDocument,
+    packageType,
+    runtimeDependencyVersion,
+  });
   const templateData = {
     generatedCommandName,
     packageName,
@@ -57,9 +69,16 @@ export async function scaffoldPackageSkills({
     packageType,
     templateData,
   });
+  const changedFilePaths = [...filePaths];
+
+  if (packageJsonUpdate.changed) {
+    await writeFile(packageJsonPath, packageJsonUpdate.source, "utf8");
+    changedFilePaths.push("package.json");
+    changedFilePaths.sort();
+  }
 
   return {
-    filePaths,
+    filePaths: changedFilePaths,
     generatedCommandName,
     packageType,
     status: "created",

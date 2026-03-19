@@ -1,7 +1,11 @@
 import { access, readFile, stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import { expect, test } from "vitest";
-import { createFixtureCopy, runPackageskillsCli } from "../support/test-project.js";
+import {
+  createFixtureCopy,
+  getExpectedRuntimeDependencyVersion,
+  runPackageskillsCli,
+} from "../support/test-project.js";
 
 const javascriptInitTestName = "init scaffolds files for a JavaScript package";
 
@@ -11,6 +15,7 @@ test(javascriptInitTestName, async () => {
   });
 
   try {
+    const expectedRuntimeDependencyVersion = await getExpectedRuntimeDependencyVersion();
     const { exitCode, stderr, stdout } = await runPackageskillsCli({
       args: ["init"],
       cwd: projectPath,
@@ -23,10 +28,18 @@ test(javascriptInitTestName, async () => {
 
     const binFilePath = resolve(projectPath, "bin", "packageskills.js");
     const skillFilePath = resolve(projectPath, "packageskills", "getting-started", "SKILL.md");
+    const packageJson = await readProjectPackageJson(projectPath);
     const binSource = await readFile(binFilePath, "utf8");
     const skillSource = await readFile(skillFilePath, "utf8");
     const binStats = await stat(binFilePath);
 
+    expect(packageJson.bin).toEqual({
+      "demo-cli-skills": "./bin/packageskills.js",
+    });
+    expect(packageJson.dependencies).toEqual({
+      "@packageskills/runtime": expectedRuntimeDependencyVersion,
+    });
+    expect(packageJson.files).toEqual(["bin", "packageskills"]);
     expect(binSource).toMatch(/\/\/ Generate by packageskills/);
     expect(binSource).toMatch(/commandName: "demo-cli-skills"/);
     expect(binSource).toMatch(/packageName: "@acme\/demo-cli"/);
@@ -45,6 +58,7 @@ test(typescriptInitTestName, async () => {
   });
 
   try {
+    const expectedRuntimeDependencyVersion = await getExpectedRuntimeDependencyVersion();
     const { exitCode, stderr, stdout } = await runPackageskillsCli({
       args: ["init"],
       cwd: projectPath,
@@ -57,9 +71,18 @@ test(typescriptInitTestName, async () => {
 
     const wrapperFilePath = resolve(projectPath, "bin", "packageskills.js");
     const sourceFilePath = resolve(projectPath, "src", "bin", "packageskills.ts");
+    const packageJson = await readProjectPackageJson(projectPath);
     const wrapperSource = await readFile(wrapperFilePath, "utf8");
     const sourceFile = await readFile(sourceFilePath, "utf8");
 
+    expect(packageJson.bin).toEqual({
+      toolkit: "./bin/toolkit.js",
+      "toolkit-skills": "./bin/packageskills.js",
+    });
+    expect(packageJson.dependencies).toEqual({
+      "@packageskills/runtime": expectedRuntimeDependencyVersion,
+    });
+    expect(packageJson.files).toEqual(["dist", "bin", "packageskills"]);
     expect(wrapperSource).toMatch(/void import\("\.\.\/dist\/bin\/packageskills\.js"\)/);
     expect(sourceFile).toMatch(/commandName: "toolkit-skills"/);
     expect(sourceFile).toMatch(/packageName: "@acme\/toolkit"/);
@@ -77,6 +100,7 @@ test(existingPackageskillsTestName, async () => {
 
   try {
     const existingSkillFilePath = resolve(projectPath, "packageskills", "custom", "SKILL.md");
+    const beforePackageJsonSource = await readFile(resolve(projectPath, "package.json"), "utf8");
     const beforeSource = await readFile(existingSkillFilePath, "utf8");
     const { exitCode, stderr, stdout } = await runPackageskillsCli({
       args: ["init"],
@@ -87,6 +111,9 @@ test(existingPackageskillsTestName, async () => {
     expect(exitCode).toBe(0);
     expect(stderr).toBe("");
     expect(stdout).toBe("`packageskills/` already exists. Skipping init.\n");
+    expect(await readFile(resolve(projectPath, "package.json"), "utf8")).toBe(
+      beforePackageJsonSource,
+    );
     expect(afterSource).toBe(beforeSource);
     await expect(access(resolve(projectPath, "bin", "packageskills.js"))).rejects.toMatchObject({
       code: "ENOENT",
@@ -104,12 +131,14 @@ test(existingBinDirectoryTestName, async () => {
   });
 
   try {
+    const expectedRuntimeDependencyVersion = await getExpectedRuntimeDependencyVersion();
     const existingBinFilePath = resolve(projectPath, "bin", "custom.js");
     const existingBinSource = await readFile(existingBinFilePath, "utf8");
     const { exitCode, stderr, stdout } = await runPackageskillsCli({
       args: ["init"],
       cwd: projectPath,
     });
+    const packageJson = await readProjectPackageJson(projectPath);
     const generatedBinSource = await readFile(
       resolve(projectPath, "bin", "packageskills.js"),
       "utf8",
@@ -118,6 +147,13 @@ test(existingBinDirectoryTestName, async () => {
     expect(exitCode).toBe(0);
     expect(stderr).toBe("");
     expect(stdout).toMatch(/Generated command: demo-cli-skills/);
+    expect(packageJson.bin).toEqual({
+      "demo-cli-skills": "./bin/packageskills.js",
+    });
+    expect(packageJson.dependencies).toEqual({
+      "@packageskills/runtime": expectedRuntimeDependencyVersion,
+    });
+    expect(packageJson.files).toEqual(["bin", "packageskills"]);
     expect(await readFile(existingBinFilePath, "utf8")).toBe(existingBinSource);
     expect(generatedBinSource).toMatch(/commandName: "demo-cli-skills"/);
   } finally {
@@ -134,6 +170,7 @@ test(existingGeneratedBinTestName, async () => {
 
   try {
     const existingBinFilePath = resolve(projectPath, "bin", "packageskills.js");
+    const beforePackageJsonSource = await readFile(resolve(projectPath, "package.json"), "utf8");
     const beforeSource = await readFile(existingBinFilePath, "utf8");
     const { exitCode, stderr, stdout } = await runPackageskillsCli({
       args: ["init"],
@@ -143,6 +180,9 @@ test(existingGeneratedBinTestName, async () => {
     expect(exitCode).toBe(1);
     expect(stdout).toBe("");
     expect(stderr).toBe("Could not scaffold `bin/packageskills.js` because it already exists.\n");
+    expect(await readFile(resolve(projectPath, "package.json"), "utf8")).toBe(
+      beforePackageJsonSource,
+    );
     expect(await readFile(existingBinFilePath, "utf8")).toBe(beforeSource);
   } finally {
     await cleanup();
@@ -160,6 +200,7 @@ test(existingPackageskillsAndBinTestName, async () => {
   try {
     const existingBinFilePath = resolve(projectPath, "bin", "custom.js");
     const existingSkillFilePath = resolve(projectPath, "packageskills", "custom", "SKILL.md");
+    const beforePackageJsonSource = await readFile(resolve(projectPath, "package.json"), "utf8");
     const beforeBinSource = await readFile(existingBinFilePath, "utf8");
     const beforeSkillSource = await readFile(existingSkillFilePath, "utf8");
     const { exitCode, stderr, stdout } = await runPackageskillsCli({
@@ -170,6 +211,9 @@ test(existingPackageskillsAndBinTestName, async () => {
     expect(exitCode).toBe(0);
     expect(stderr).toBe("");
     expect(stdout).toBe("`packageskills/` already exists. Skipping init.\n");
+    expect(await readFile(resolve(projectPath, "package.json"), "utf8")).toBe(
+      beforePackageJsonSource,
+    );
     expect(await readFile(existingBinFilePath, "utf8")).toBe(beforeBinSource);
     expect(await readFile(existingSkillFilePath, "utf8")).toBe(beforeSkillSource);
     await expect(access(resolve(projectPath, "bin", "packageskills.js"))).rejects.toMatchObject({
@@ -179,3 +223,17 @@ test(existingPackageskillsAndBinTestName, async () => {
     await cleanup();
   }
 });
+
+async function readProjectPackageJson(projectPath: string): Promise<{
+  bin?: unknown;
+  dependencies?: unknown;
+  files?: unknown;
+}> {
+  const packageJsonSource = await readFile(resolve(projectPath, "package.json"), "utf8");
+
+  return JSON.parse(packageJsonSource) as {
+    bin?: unknown;
+    dependencies?: unknown;
+    files?: unknown;
+  };
+}

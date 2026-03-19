@@ -1,5 +1,5 @@
 import { execFile as execFileCallback } from "node:child_process";
-import { cp, mkdtemp, rm } from "node:fs/promises";
+import { cp, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -75,6 +75,22 @@ export async function runPackageskillsCli({ args, cwd }: { args: string[]; cwd: 
 
     throw error;
   }
+}
+
+export async function getExpectedRuntimeDependencyVersion(): Promise<string> {
+  const cliPackageJsonSource = await readFile(
+    resolveWorkspacePath("packages", "cli", "package.json"),
+    "utf8",
+  );
+  const cliPackageJson = JSON.parse(cliPackageJsonSource) as {
+    version?: unknown;
+  };
+
+  if (typeof cliPackageJson.version !== "string" || cliPackageJson.version.length === 0) {
+    throw new Error("Could not determine the CLI package version for test expectations.");
+  }
+
+  return `^${cliPackageJson.version}`;
 }
 
 interface FailedCommandError extends Error {
