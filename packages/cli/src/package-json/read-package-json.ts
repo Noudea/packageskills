@@ -5,10 +5,7 @@ export interface PackageJson {
   name?: unknown;
 }
 
-export function getGeneratedCommandName(
-  packageJson: PackageJson,
-  packageName: string,
-): string {
+export function getGeneratedCommandName(packageJson: PackageJson, packageName: string): string {
   const primaryCommandName = getPrimaryCommandName(packageJson, packageName);
 
   if (primaryCommandName.endsWith("-skills")) {
@@ -26,16 +23,16 @@ export function getPackageName(packageJson: PackageJson): string {
   return packageJson.name;
 }
 
-export async function readPackageJson(
-  packageJsonPath: string,
-): Promise<PackageJson> {
+export async function readPackageJson(packageJsonPath: string): Promise<PackageJson> {
   let packageJsonSource: string;
 
   try {
     packageJsonSource = await readFile(packageJsonPath, "utf8");
   } catch (error) {
     if (isMissingPathError(error)) {
-      throw new Error("Could not find `package.json` in the current directory.");
+      throw new Error("Could not find `package.json` in the current directory.", {
+        cause: error,
+      });
     }
 
     throw error;
@@ -45,8 +42,10 @@ export async function readPackageJson(
 
   try {
     parsedPackageJson = JSON.parse(packageJsonSource);
-  } catch {
-    throw new Error("Could not parse `package.json` in the current directory.");
+  } catch (error) {
+    throw new Error("Could not parse `package.json` in the current directory.", {
+      cause: error,
+    });
   }
 
   if (!isRecord(parsedPackageJson)) {
@@ -56,10 +55,7 @@ export async function readPackageJson(
   return parsedPackageJson;
 }
 
-function getPrimaryCommandName(
-  packageJson: PackageJson,
-  packageName: string,
-): string {
+function getPrimaryCommandName(packageJson: PackageJson, packageName: string): string {
   const unscopedPackageName = getUnscopedPackageName(packageName);
 
   if (typeof packageJson.bin === "string") {
@@ -84,9 +80,7 @@ function getPrimaryCommandName(
 }
 
 function getUnscopedPackageName(packageName: string): string {
-  return packageName.startsWith("@")
-    ? packageName.split("/").at(1) ?? packageName
-    : packageName;
+  return packageName.startsWith("@") ? (packageName.split("/").at(1) ?? packageName) : packageName;
 }
 
 function isMissingPathError(error: unknown): boolean {

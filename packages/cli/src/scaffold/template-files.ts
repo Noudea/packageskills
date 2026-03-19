@@ -48,10 +48,7 @@ export async function scaffoldTemplateFiles({
     const templateFilePaths = await listTemplateFilePaths(templateDirectory);
 
     for (const templateFilePath of templateFilePaths) {
-      const outputRelativePath = getOutputRelativePath(
-        templateDirectory,
-        templateFilePath,
-      );
+      const outputRelativePath = getOutputRelativePath(templateDirectory, templateFilePath);
       const templateSource = await readFile(templateFilePath, "utf8");
       const renderedTemplate = renderTemplate(templateSource, templateData);
 
@@ -70,10 +67,7 @@ export async function scaffoldTemplateFiles({
   return filePaths;
 }
 
-function getOutputRelativePath(
-  templateDirectory: string,
-  templateFilePath: string,
-): string {
+function getOutputRelativePath(templateDirectory: string, templateFilePath: string): string {
   return relative(templateDirectory, templateFilePath).replace(/\.hbs$/, "");
 }
 
@@ -151,7 +145,9 @@ async function writeScaffoldFile({
     });
   } catch (error) {
     if (isFileExistsError(error)) {
-      throw new Error(`Could not scaffold \`${outputRelativePath}\` because it already exists.`);
+      throw new Error(`Could not scaffold \`${outputRelativePath}\` because it already exists.`, {
+        cause: error,
+      });
     }
 
     throw error;

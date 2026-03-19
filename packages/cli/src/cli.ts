@@ -6,17 +6,13 @@ import { runInit } from "./commands/init.js";
 const cli = cac("packageskills");
 
 function reportCliError(error: unknown): void {
-  process.stderr.write(
-    `${error instanceof Error ? error.message : String(error)}\n`,
-  );
+  process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
   process.exitCode = 1;
 }
 
-cli
-  .command("init", "Scaffold packageskills into the current package")
-  .action(() => {
-    void runInit().catch(reportCliError);
-  });
+cli.command("init", "Scaffold packageskills into the current package").action(() => {
+  void runInit().catch(reportCliError);
+});
 
 cli.help();
 

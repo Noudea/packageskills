@@ -10,9 +10,7 @@ export async function runInit(): Promise<void> {
     return;
   }
 
-  process.stdout.write(
-    `Scaffolded packageskills files for a ${result.packageType} package.\n`,
-  );
+  process.stdout.write(`Scaffolded packageskills files for a ${result.packageType} package.\n`);
   process.stdout.write(`Generated command: ${result.generatedCommandName}\n`);
 
   for (const filePath of result.filePaths) {

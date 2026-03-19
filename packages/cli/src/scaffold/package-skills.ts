@@ -26,9 +26,7 @@ interface CreatedScaffoldResult {
   status: "created";
 }
 
-export type ScaffoldPackageSkillsResult =
-  | CreatedScaffoldResult
-  | SkippedScaffoldResult;
+export type ScaffoldPackageSkillsResult = CreatedScaffoldResult | SkippedScaffoldResult;
 
 export async function scaffoldPackageSkills({
   cwd,

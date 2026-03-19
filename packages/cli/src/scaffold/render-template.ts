@@ -5,10 +5,7 @@ export interface TemplateData {
   packageName: string;
 }
 
-export function renderTemplate(
-  templateSource: string,
-  templateData: TemplateData,
-): string {
+export function renderTemplate(templateSource: string, templateData: TemplateData): string {
   const template = Handlebars.compile(templateSource, {
     noEscape: true,
   });

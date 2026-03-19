@@ -32,9 +32,7 @@ export async function createFixtureCopy(
   });
 
   if (shouldKeepTestProjects()) {
-    const label = options.testName
-      ? ` for \"${options.testName}\"`
-      : "";
+    const label = options.testName ? ` for "${options.testName}"` : "";
 
     process.stdout.write(`Keeping test project${label} at ${projectPath}\n`);
   }
@@ -51,13 +49,7 @@ export async function createFixtureCopy(
   };
 }
 
-export async function runPackageskillsCli({
-  args,
-  cwd,
-}: {
-  args: string[];
-  cwd: string;
-}): Promise<{
+export async function runPackageskillsCli({ args, cwd }: { args: string[]; cwd: string }): Promise<{
   exitCode: number;
   stderr: string;
   stdout: string;
@@ -93,10 +85,10 @@ interface FailedCommandError extends Error {
 
 function isFailedCommand(error: unknown): error is FailedCommandError {
   return (
-    error instanceof Error
-    && typeof (error as FailedCommandError).code === "number"
-    && typeof (error as FailedCommandError).stderr === "string"
-    && typeof (error as FailedCommandError).stdout === "string"
+    error instanceof Error &&
+    typeof (error as FailedCommandError).code === "number" &&
+    typeof (error as FailedCommandError).stderr === "string" &&
+    typeof (error as FailedCommandError).stdout === "string"
   );
 }
 
