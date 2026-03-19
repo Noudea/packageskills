@@ -142,7 +142,7 @@ export async function runPackageskillsRuntime({
 
 export async function getExpectedRuntimeDependencyVersion(): Promise<string> {
   const cliPackageJsonSource = await readFile(
-    resolveWorkspacePath("packages", "cli", "package.json"),
+    resolveWorkspacePath("packages", "packageskills", "package.json"),
     "utf8",
   );
   const runtimePackageJsonSource = await readFile(
@@ -215,7 +215,7 @@ function resolveWorkspaceDependencyVersion(
 }
 
 function getCliEntryFilePath(): string {
-  return resolveWorkspacePath("packages", "cli", "dist", "cli.js");
+  return resolveWorkspacePath("packages", "packageskills", "dist", "cli.js");
 }
 
 function getRuntimeEntryFilePath(): string {

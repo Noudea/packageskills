@@ -46,9 +46,9 @@ importers:
     devDependencies:
       packageskills:
         specifier: workspace:*
-        version: link:../../packages/cli
+        version: link:../../packages/packageskills
 
-  packages/cli:
+  packages/packageskills:
     dependencies:
       "@packageskills/runtime":
         specifier: workspace:^
