@@ -1,0 +1,26 @@
+{
+  "name": "packageskills",
+  "version": "0.0.0",
+  "description": "CLI for scaffolding and packaging agent skills.",
+  "type": "module",
+  "bin": {
+    "packageskills": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "src/templates"
+  ],
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "cac": "^7.0.0",
+    "handlebars": "^4.7.8",
+    "jsonc-parser": "^3.3.1"
+  }
+}
