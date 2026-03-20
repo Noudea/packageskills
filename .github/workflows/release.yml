@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version to publish without the leading v
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -16,17 +22,27 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.32.1
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           cache: pnpm
           node-version: 22
           registry-url: https://registry.npmjs.org
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Prepare pnpm
+        run: corepack prepare pnpm@10.32.1 --activate
+
+      - name: Resolve release version
+        id: release_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "value=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -36,7 +52,7 @@ jobs:
           node --input-type=module <<'EOF'
           import { readFile } from "node:fs/promises";
 
-          const tagVersion = process.env.GITHUB_REF_NAME?.replace(/^v/, "");
+          const tagVersion = process.env.RELEASE_VERSION;
 
           if (!tagVersion) {
             throw new Error("Could not determine the release tag version.");
@@ -57,10 +73,12 @@ jobs:
 
           if (packageSkillsPackageJson.version !== tagVersion) {
             throw new Error(
-              `Tag version v${tagVersion} does not match package version ${packageSkillsPackageJson.version}.`,
+              `Release version ${tagVersion} does not match package version ${packageSkillsPackageJson.version}.`,
             );
           }
           EOF
+        env:
+          RELEASE_VERSION: ${{ steps.release_version.outputs.value }}
 
       - name: Lint
         run: pnpm lint
@@ -68,12 +86,32 @@ jobs:
       - name: Test
         run: pnpm test
 
+      - name: Check runtime publication status
+        id: runtime_publication
+        run: |
+          if npm view @packageskills/runtime@${{ steps.release_version.outputs.value }} version >/dev/null 2>&1; then
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check packageskills publication status
+        id: packageskills_publication
+        run: |
+          if npm view packageskills@${{ steps.release_version.outputs.value }} version >/dev/null 2>&1; then
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish runtime
+        if: steps.runtime_publication.outputs.should_publish == 'true'
         run: pnpm --filter @packageskills/runtime publish --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish packageskills
+        if: steps.packageskills_publication.outputs.should_publish == 'true'
         run: pnpm --filter packageskills publish --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
