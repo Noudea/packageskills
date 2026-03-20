@@ -86,12 +86,15 @@ pnpm test
 
 This repo includes two local demo apps:
 
-- `apps/sandbox-maintainer`: maintainer-side package scaffolded with `packageskills`
+- `apps/sandbox-maintainer`: maintainer-side package where you can rerun `packageskills init`
 - `apps/sandbox-consumer`: consumer-side project that runs the generated `sandbox-skills` command
 
 Try the full flow:
 
 ```bash
+cd apps/sandbox-maintainer
+pnpm exec packageskills init
+cd ../..
 pnpm install
 cd apps/sandbox-consumer
 pnpm exec sandbox-skills install

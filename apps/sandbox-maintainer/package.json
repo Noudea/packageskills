@@ -12,8 +12,5 @@
   ],
   "dependencies": {
     "@packageskills/runtime": "workspace:^"
-  },
-  "bin": {
-    "sandbox-skills": "./bin/packageskills.js"
   }
 }
