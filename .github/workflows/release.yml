@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          cache: pnpm
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify release versions
+        run: |
+          node --input-type=module <<'EOF'
+          import { readFile } from "node:fs/promises";
+
+          const tagVersion = process.env.GITHUB_REF_NAME?.replace(/^v/, "");
+
+          if (!tagVersion) {
+            throw new Error("Could not determine the release tag version.");
+          }
+
+          const packageSkillsPackageJson = JSON.parse(
+            await readFile("packages/packageskills/package.json", "utf8"),
+          );
+          const runtimePackageJson = JSON.parse(
+            await readFile("packages/runtime/package.json", "utf8"),
+          );
+
+          if (packageSkillsPackageJson.version !== runtimePackageJson.version) {
+            throw new Error(
+              `Package versions must match before release. packageskills=${packageSkillsPackageJson.version}, runtime=${runtimePackageJson.version}`,
+            );
+          }
+
+          if (packageSkillsPackageJson.version !== tagVersion) {
+            throw new Error(
+              `Tag version v${tagVersion} does not match package version ${packageSkillsPackageJson.version}.`,
+            );
+          }
+          EOF
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Test
+        run: pnpm test
+
+      - name: Publish runtime
+        run: pnpm --filter @packageskills/runtime publish --access public --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish packageskills
+        run: pnpm --filter packageskills publish --access public --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

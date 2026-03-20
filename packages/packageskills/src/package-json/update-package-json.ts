@@ -56,6 +56,7 @@ function assertPackageJsonCanBeUpdated(
   generatedCommandName: string,
 ): void {
   assertBinFieldIsSupported(packageJson, generatedCommandName);
+  assertDevDependenciesFieldIsSupported(packageJson);
   assertFilesFieldIsSupported(packageJson);
   assertDependenciesFieldIsSupported(packageJson);
 }
@@ -107,6 +108,14 @@ function assertDependenciesFieldIsSupported(packageJson: PackageJson): void {
   throw new Error("`package.json` has an unsupported `dependencies` field. Expected an object.");
 }
 
+function assertDevDependenciesFieldIsSupported(packageJson: PackageJson): void {
+  if (packageJson.devDependencies === undefined || isRecord(packageJson.devDependencies)) {
+    return;
+  }
+
+  throw new Error("`package.json` has an unsupported `devDependencies` field. Expected an object.");
+}
+
 function assertFilesFieldIsSupported(packageJson: PackageJson): void {
   if (packageJson.files === undefined || Array.isArray(packageJson.files)) {
     return;
@@ -152,42 +161,41 @@ function updateDependenciesField(
   packageJson: PackageJson,
   runtimeDependencyVersion: string,
 ): PackageJsonUpdateResult {
-  const dependencyVersion = getRuntimeDependencyVersion(packageJson, runtimeDependencyVersion);
+  const currentDependencyVersion = getCurrentRuntimeDependencyVersion(packageJson.dependencies);
+  const currentDevDependencyVersion = getCurrentRuntimeDependencyVersion(
+    packageJson.devDependencies,
+  );
+  let nextSource = packageJsonSource;
+  let changed = false;
 
   if (isRecord(packageJson.dependencies)) {
-    if (packageJson.dependencies[runtimePackageName] === dependencyVersion) {
-      return {
-        changed: false,
-        dependencyChanged: false,
-        source: packageJsonSource,
-      };
-    }
-
-    if (typeof packageJson.dependencies[runtimePackageName] === "string") {
-      return {
-        changed: false,
-        dependencyChanged: false,
-        source: packageJsonSource,
-      };
-    }
-
-    return {
-      changed: true,
-      dependencyChanged: true,
-      source: applyModify(
-        packageJsonSource,
+    if (currentDependencyVersion !== runtimeDependencyVersion) {
+      nextSource = applyModify(
+        nextSource,
         ["dependencies", runtimePackageName],
-        dependencyVersion,
-      ),
-    };
+        runtimeDependencyVersion,
+      );
+      changed = true;
+    }
+  } else {
+    nextSource = applyModify(nextSource, ["dependencies"], {
+      [runtimePackageName]: runtimeDependencyVersion,
+    });
+    changed = true;
+  }
+
+  if (currentDevDependencyVersion !== undefined) {
+    nextSource = removeRuntimeDevDependency(nextSource, packageJson.devDependencies);
+    changed = true;
   }
 
   return {
-    changed: true,
-    dependencyChanged: true,
-    source: applyModify(packageJsonSource, ["dependencies"], {
-      [runtimePackageName]: dependencyVersion,
-    }),
+    changed,
+    dependencyChanged:
+      changed &&
+      (currentDependencyVersion !== runtimeDependencyVersion ||
+        currentDevDependencyVersion !== undefined),
+    source: nextSource,
   };
 }
 
@@ -227,25 +235,33 @@ function getRequiredFiles(packageType: PackageType): string[] {
   return requiredFiles;
 }
 
-function getRuntimeDependencyVersion(
-  packageJson: PackageJson,
-  runtimeDependencyVersion: string,
+function removeRuntimeDevDependency(
+  packageJsonSource: string,
+  devDependencies: PackageJson["devDependencies"],
 ): string {
-  if (
-    isRecord(packageJson.dependencies) &&
-    typeof packageJson.dependencies[runtimePackageName] === "string"
-  ) {
-    return packageJson.dependencies[runtimePackageName];
+  if (!isRecord(devDependencies)) {
+    return packageJsonSource;
   }
 
-  if (
-    isRecord(packageJson.devDependencies) &&
-    typeof packageJson.devDependencies[runtimePackageName] === "string"
-  ) {
-    return packageJson.devDependencies[runtimePackageName];
+  const devDependencyKeys = Object.keys(devDependencies);
+
+  if (devDependencyKeys.length === 1 && devDependencyKeys[0] === runtimePackageName) {
+    return applyModify(packageJsonSource, ["devDependencies"], undefined);
   }
 
-  return runtimeDependencyVersion;
+  return applyModify(packageJsonSource, ["devDependencies", runtimePackageName], undefined);
+}
+
+function getCurrentRuntimeDependencyVersion(
+  dependencies: PackageJson["dependencies"] | PackageJson["devDependencies"],
+): string | undefined {
+  if (!isRecord(dependencies)) {
+    return undefined;
+  }
+
+  const runtimeDependencyVersion = dependencies[runtimePackageName];
+
+  return typeof runtimeDependencyVersion === "string" ? runtimeDependencyVersion : undefined;
 }
 
 function applyModify(

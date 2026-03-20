@@ -1,6 +1,6 @@
 {
   "name": "packageskills",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "CLI for scaffolding and packaging agent skills.",
   "license": "MIT",
   "type": "module",
@@ -29,6 +29,9 @@
     "dist",
     "src/templates"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "exports": {
     ".": "./dist/index.js"
   },

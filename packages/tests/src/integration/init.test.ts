@@ -1,4 +1,4 @@
-import { access, readFile, stat } from "node:fs/promises";
+import { access, readFile, stat, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { expect, test } from "vitest";
 import {
@@ -293,7 +293,7 @@ test(existingPackageskillsAndBinTestName, async () => {
 });
 
 const stringBinAndRuntimeTestName =
-  "init preserves a string bin, existing runtime dependency, and existing files entries";
+  "init updates a stale runtime dependency while preserving other package.json entries";
 
 test(stringBinAndRuntimeTestName, async () => {
   const { cleanup, projectPath } = await createFixtureCopy("init/string-bin-with-runtime", {
@@ -301,6 +301,7 @@ test(stringBinAndRuntimeTestName, async () => {
   });
 
   try {
+    const expectedRuntimeDependencyVersion = await getExpectedRuntimeDependencyVersion();
     const { exitCode, stderr, stdout } = await runPackageskillsCli({
       args: ["init"],
       cwd: projectPath,
@@ -310,13 +311,13 @@ test(stringBinAndRuntimeTestName, async () => {
     expect(exitCode).toBe(0);
     expect(stderr).toBe("");
     expect(stdout).toMatch(/Generated command: demo-cli-skills/);
-    expect(stdout).not.toMatch(/Next step: run `/);
+    expect(stdout).toMatch(/Next step: run `npm install` to install `@packageskills\/runtime`\./);
     expect(packageJson.bin).toEqual({
       "demo-cli": "./bin/demo.js",
       "demo-cli-skills": "./bin/packageskills.js",
     });
     expect(packageJson.dependencies).toEqual({
-      "@packageskills/runtime": "^9.9.9",
+      "@packageskills/runtime": expectedRuntimeDependencyVersion,
       chalk: "^5.4.0",
     });
     expect(packageJson.files).toEqual(["README.md", "bin", "packageskills"]);
@@ -326,7 +327,7 @@ test(stringBinAndRuntimeTestName, async () => {
 });
 
 const runtimeDevDependencyTestName =
-  "init promotes a runtime devDependency into dependencies when needed";
+  "init moves a runtime devDependency into dependencies and updates it";
 
 test(runtimeDevDependencyTestName, async () => {
   const { cleanup, projectPath } = await createFixtureCopy("init/runtime-devdependency", {
@@ -334,6 +335,7 @@ test(runtimeDevDependencyTestName, async () => {
   });
 
   try {
+    const expectedRuntimeDependencyVersion = await getExpectedRuntimeDependencyVersion();
     const { exitCode, stderr, stdout } = await runPackageskillsCli({
       args: ["init"],
       cwd: projectPath,
@@ -345,12 +347,50 @@ test(runtimeDevDependencyTestName, async () => {
     expect(stdout).toMatch(/Generated command: demo-cli-skills/);
     expect(stdout).toMatch(/Next step: run `npm install` to install `@packageskills\/runtime`\./);
     expect(packageJson.dependencies).toEqual({
-      "@packageskills/runtime": "^1.2.3",
+      "@packageskills/runtime": expectedRuntimeDependencyVersion,
     });
-    expect(packageJson.devDependencies).toEqual({
-      "@packageskills/runtime": "^1.2.3",
-    });
+    expect(packageJson.devDependencies).toBeUndefined();
     expect(packageJson.files).toEqual(["bin", "packageskills"]);
+  } finally {
+    await cleanup();
+  }
+});
+
+const currentRuntimeDependencyTestName =
+  "init keeps an up-to-date runtime dependency without asking for reinstall";
+
+test(currentRuntimeDependencyTestName, async () => {
+  const { cleanup, projectPath } = await createFixtureCopy("init/javascript-basic", {
+    testName: currentRuntimeDependencyTestName,
+  });
+
+  try {
+    const expectedRuntimeDependencyVersion = await getExpectedRuntimeDependencyVersion();
+    const packageJsonPath = resolve(projectPath, "package.json");
+    const packageJson = JSON.parse(await readFile(packageJsonPath, "utf8")) as Record<
+      string,
+      unknown
+    >;
+
+    packageJson.dependencies = {
+      "@packageskills/runtime": expectedRuntimeDependencyVersion,
+    };
+
+    await writeFile(packageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`, "utf8");
+
+    const { exitCode, stderr, stdout } = await runPackageskillsCli({
+      args: ["init"],
+      cwd: projectPath,
+    });
+    const updatedPackageJson = await readProjectPackageJson(projectPath);
+
+    expect(exitCode).toBe(0);
+    expect(stderr).toBe("");
+    expect(stdout).toMatch(/Generated command: demo-cli-skills/);
+    expect(stdout).not.toMatch(/Next step: run `/);
+    expect(updatedPackageJson.dependencies).toEqual({
+      "@packageskills/runtime": expectedRuntimeDependencyVersion,
+    });
   } finally {
     await cleanup();
   }
