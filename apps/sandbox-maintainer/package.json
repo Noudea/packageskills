@@ -6,10 +6,6 @@
   "devDependencies": {
     "packageskills": "workspace:*"
   },
-  "files": [
-    "bin",
-    "packageskills"
-  ],
   "dependencies": {
     "@packageskills/runtime": "workspace:^"
   }
